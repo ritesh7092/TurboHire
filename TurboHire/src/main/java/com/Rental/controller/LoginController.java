@@ -1,64 +1,59 @@
 package com.Rental.controller;
 
-import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 
 import com.Rental.model.CarUser;
 import com.Rental.service.CarUserService;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PostMapping;
 
 @RestController
-
+@RequestMapping("/api/auth") // Base URL for authentication
 public class LoginController {
-	
-	@Autowired
-	private CarUserService service;
-	
-	@Autowired
-	private BCryptPasswordEncoder bCrypt;
-	
-	@GetMapping("/loginpage")
-	 public ModelAndView showLoginPage() {
-		 return new ModelAndView("loginPage");
-	 }
-	 @GetMapping("/loginerror")
-	 public ModelAndView showLoginErrorPage() {
-		 return new ModelAndView("loginErrorPage");
-	 }
-	
-	
-	@GetMapping("/index")
-	public ModelAndView showIndexPage()
-	{
-		String role=service.getRole();
-		String page="";
-		if(role.equalsIgnoreCase("Admin"))
-			page="index1";
-		else if(role.equalsIgnoreCase("Customer"))
-			page="index2";
-		return new ModelAndView(page);
-	}
-	@GetMapping("/register")
-	public ModelAndView newUserEntryPage() {
-		ModelAndView mv=new ModelAndView("newUserEntry");
-		CarUser carUser=new CarUser();
-		mv.addObject("userRecord",carUser);
-		return mv;
-	}
-	@PostMapping("/register")
-	public ModelAndView saveNewUser(@ModelAttribute("userRecord") CarUser carUser) {
-		CarUser newUser=new CarUser();
-		String encodedPassword = bCrypt.encode(carUser.getPassword());
-		newUser.setUsername(carUser.getUsername());
-		newUser.setRole(carUser.getRole());
-		newUser.setEmail(carUser.getEmail());
-		newUser.setPassword(encodedPassword);
-		service.save(newUser);
-		return new ModelAndView("loginPage");
-	}
+    
+    @Autowired
+    private CarUserService service;
+
+    @Autowired
+    private BCryptPasswordEncoder bCrypt;
+
+    // Login Endpoint
+    @PostMapping("/login")
+    public ResponseEntity<?> loginUser(@RequestBody CarUser loginRequest) {
+        CarUser user = service.findByEmail(loginRequest.getEmail());
+        
+        if (user == null || !bCrypt.matches(loginRequest.getPassword(), user.getPassword())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid credentials");
+        }
+
+        // Return user role along with success message
+        return ResponseEntity.ok().body("{\"message\": \"Login successful\", \"role\": \"" + user.getRole() + "\"}");
+    }
+
+    // Register New User
+    @PostMapping("/register")
+    public ResponseEntity<?> registerUser(@RequestBody CarUser carUser) {
+        if (service.findByEmail(carUser.getEmail()) != null) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Email already exists");
+        }
+
+        String encodedPassword = bCrypt.encode(carUser.getPassword());
+        carUser.setPassword(encodedPassword);
+        service.save(carUser);
+
+        return ResponseEntity.ok().body("User registered successfully");
+    }
+
+    // Get User Role (for client-side redirection)
+    @GetMapping("/role/{email}")
+    public ResponseEntity<?> getUserRole(@PathVariable String email) {
+        CarUser user = service.findByEmail(email);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+        }
+        return ResponseEntity.ok().body("{\"role\": \"" + user.getRole() + "\"}");
+    }
 }

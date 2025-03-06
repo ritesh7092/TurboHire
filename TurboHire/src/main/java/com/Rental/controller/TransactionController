@@ -4,114 +4,136 @@ import com.Rental.model.Car;
 import com.Rental.model.CarBooking;
 import com.Rental.model.Customer;
 import com.Rental.model.Transaction;
-import com.Rental.model.*;
+import com.Rental.repository.TransactionRepository;
+import com.Rental.service.CarBookingService;
+import com.Rental.service.CarService;
+import com.Rental.service.CustomerService;
+import com.Rental.service.TransactionService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.ModelAndView;
 
 import java.util.List;
+import java.util.Optional;
 
 @RestController
+@RequestMapping("/transactions")
 public class TransactionController {
-    @Autowired
-    private CarBookingDao carBookingDao;
-    @Autowired
-    TransactionDao transactionDao;
-    @Autowired
-    private TransactionRepository transactionRepository;
-    @Autowired
-    private CarDao carDao;
-    @Autowired
-    private CustomerDao customerDao;
-    @GetMapping("/makePayment/{bookingId}")
-    public ModelAndView showPaymentPage(@PathVariable String bookingId) {
-        Transaction transaction = new Transaction();
-        CarBooking carBooking = carBookingDao.findById(bookingId);
-        Double totalPayment = carBooking.getTotalPayment();
-        Double pendingPayment = carBooking.getPendingPayment();
 
-        transaction.setTransactionId(transactionDao.generateTransactionId());
+    @Autowired
+    private TransactionService transactionService;
+    
+    @Autowired
+    private CarBookingService carBookingService;
+    
+    @Autowired
+    private CarService carService;
+    
+    @Autowired
+    private CustomerService customerService;
+
+    @GetMapping("/makePayment/{bookingId}")
+    public ResponseEntity<?> getPaymentDetails(@PathVariable String bookingId) {
+        Optional<CarBooking> carBookingOpt = carBookingService.findById(bookingId);
+        if (carBookingOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body("Booking not found");
+        }
+
+        CarBooking carBooking = carBookingOpt.get();
+        Transaction transaction = new Transaction();
+        transaction.setTransactionId(transactionService.generateTransactionId());
         transaction.setBookingId(bookingId);
 
-        ModelAndView mv = new ModelAndView("paymentPage");
-        mv.addObject("transaction", transaction);
-        mv.addObject("totalPayment", totalPayment);
-        mv.addObject("pendingPayment", pendingPayment);
-        return mv;
+        return ResponseEntity.ok().body(new PaymentResponse(transaction, carBooking.getTotalPayment(), carBooking.getPendingPayment()));
     }
 
     @PostMapping("/makePayment")
-    public ModelAndView makePayment(@ModelAttribute("transaction") Transaction transaction) {
+    public ResponseEntity<?> makePayment(@RequestBody Transaction transaction) {
         transaction.setApproved(null);
-        transactionRepository.save(transaction);
-        System.out.println("after save");
-        return new ModelAndView("redirect:/bookingReport/" + transaction.getBookingId());
+        transactionService.save(transaction);
+        return ResponseEntity.ok().body("Payment recorded successfully");
     }
 
-    @GetMapping("/updatePaymentStatus/{txnId}/{status}")
-    public ModelAndView updatePaymentStatus(@PathVariable String txnId, @PathVariable String status) {
-        Transaction transaction = transactionDao.findById(txnId);
-        transaction.setApproved(status.equalsIgnoreCase("approve"));
-        transactionRepository.save(transaction);
-
-        if(status.equalsIgnoreCase("approve")) {
-            CarBooking carBooking = carBookingDao.findById(transaction.getBookingId());
-            carBooking.setPendingPayment(carBooking.getPendingPayment() - transaction.getAmount());
-            if(carBooking.getAdvancePayment() == 0.0) {
-                // First payment
-                carBooking.setAdvancePayment(transaction.getAmount());
-                updateCarStatus(carBooking.getCarNumber(), false);
-                updateCustomerStatus(carBooking.getUsername(), false);
-            }
-
-            carBooking.setStatus("CNF");
-            carBookingDao.save(carBooking);
+    @PutMapping("/updatePaymentStatus/{txnId}/{status}")
+    public ResponseEntity<?> updatePaymentStatus(@PathVariable String txnId, @PathVariable String status) {
+        Optional<Transaction> transactionOpt = transactionService.findById(txnId);
+        if (transactionOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body("Transaction not found");
         }
 
-        return new ModelAndView("redirect:/bookingPayments");
+        Transaction transaction = transactionOpt.get();
+        transaction.setApproved(status.equalsIgnoreCase("approve"));
+        transactionService.save(transaction);
+
+        if (status.equalsIgnoreCase("approve")) {
+            Optional<CarBooking> carBookingOpt = carBookingService.findById(transaction.getBookingId());
+            if (carBookingOpt.isPresent()) {
+                CarBooking carBooking = carBookingOpt.get();
+                carBooking.setPendingPayment(carBooking.getPendingPayment() - transaction.getAmount());
+
+                if (carBooking.getAdvancePayment() == 0.0) {
+                    carBooking.setAdvancePayment(transaction.getAmount());
+                    carService.updateCarStatus(carBooking.getCarNumber(), false);
+                    customerService.updateCustomerStatus(carBooking.getUsername(), false);
+                }
+
+                carBooking.setStatus("CNF");
+                carBookingService.save(carBooking);
+            }
+        }
+
+        return ResponseEntity.ok().body("Payment status updated successfully");
     }
 
     @GetMapping("/bookingPayments")
-    public ModelAndView showBookingPayments() {
-        ModelAndView mv = new ModelAndView("bookingPayments");
-        List<Transaction> transactions = transactionRepository.findAll();
-        mv.addObject("transactions", transactions);
-        return mv;
+    public ResponseEntity<List<Transaction>> getAllBookingPayments() {
+        return ResponseEntity.ok(transactionService.findAll());
     }
 
-    @GetMapping("/returnBooking/{bookingId}")
-    public ModelAndView bookingReturn(@PathVariable String bookingId) {
-        CarBooking carBooking = carBookingDao.findById(bookingId);
+    @PutMapping("/returnBooking/{bookingId}")
+    public ResponseEntity<?> returnBooking(@PathVariable String bookingId) {
+        Optional<CarBooking> carBookingOpt = carBookingService.findById(bookingId);
+        if (carBookingOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body("Booking not found");
+        }
+
+        CarBooking carBooking = carBookingOpt.get();
         carBooking.setStatus("R");
 
-        updateCarStatus(carBooking.getCarNumber(), true);
-        updateCustomerStatus(carBooking.getUsername(), true);
+        carService.updateCarStatus(carBooking.getCarNumber(), true);
+        customerService.updateCustomerStatus(carBooking.getUsername(), true);
 
-        carBookingDao.save(carBooking);
+        carBookingService.save(carBooking);
 
-        return new ModelAndView("redirect:/bookingReport/" + bookingId);
+        return ResponseEntity.ok().body("Booking returned successfully");
     }
 
-    @GetMapping("/cancelBooking/{bookingId}")
-    public ModelAndView bookingCancel(@PathVariable String bookingId) {
-        CarBooking carBooking = carBookingDao.findById(bookingId);
+    @PutMapping("/cancelBooking/{bookingId}")
+    public ResponseEntity<?> cancelBooking(@PathVariable String bookingId) {
+        Optional<CarBooking> carBookingOpt = carBookingService.findById(bookingId);
+        if (carBookingOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body("Booking not found");
+        }
+
+        CarBooking carBooking = carBookingOpt.get();
         carBooking.setStatus("C");
-        carBookingDao.save(carBooking);
+        carBookingService.save(carBooking);
 
-        updateCarStatus(carBooking.getCarNumber(), true);
-        updateCustomerStatus(carBooking.getUsername(), true);
+        carService.updateCarStatus(carBooking.getCarNumber(), true);
+        customerService.updateCustomerStatus(carBooking.getUsername(), true);
 
-        return new ModelAndView("redirect:/bookingReport/" + bookingId);
-    }
-    private void updateCarStatus(String carNumber, Boolean status) {
-        Car car = carDao.findById(carNumber);
-        car.setAvailable(status);
-        carDao.save(car);
+        return ResponseEntity.ok().body("Booking canceled successfully");
     }
 
-    private void updateCustomerStatus(String username, Boolean status) {
-        Customer customer = customerDao.findById(username);
-        customer.setStatus(status);
-        customerDao.save(customer);
+    private static class PaymentResponse {
+        public Transaction transaction;
+        public Double totalPayment;
+        public Double pendingPayment;
+
+        public PaymentResponse(Transaction transaction, Double totalPayment, Double pendingPayment) {
+            this.transaction = transaction;
+            this.totalPayment = totalPayment;
+            this.pendingPayment = pendingPayment;
+        }
     }
 }
