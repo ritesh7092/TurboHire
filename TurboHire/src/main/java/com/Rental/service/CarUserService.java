@@ -39,8 +39,7 @@ public class CarUserService implements UserDetailsService{
 			return email; 
 		 }
     public CarUser findByEmail(String email2) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'findByEmail'");
+		return repository.findByEmail(email2);
     }
 	 
 	  

@@ -1,11 +1,16 @@
 package com.Rental.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 @Entity
 public class Customer {
-
+    @NotBlank
+	@Size(min = 5, message = "Username must be at least 5 characters long")
+	@Column(nullable = false, unique = true)
 	@Id
 	private String username;
 	private String firstName;

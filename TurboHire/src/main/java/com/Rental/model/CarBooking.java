@@ -1,10 +1,15 @@
 package com.Rental.model;
 
+import io.micrometer.common.lang.NonNull;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 @Entity
 public class CarBooking {
+	    @NotBlank(message = "Booking ID is mandatory")
 		@Id
 		private String bookingId;
 		private String username;

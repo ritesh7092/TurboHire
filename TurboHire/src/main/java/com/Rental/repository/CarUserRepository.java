@@ -6,4 +6,6 @@ import com.Rental.model.CarUser;
 
 public interface CarUserRepository extends JpaRepository<CarUser, String> {
 
+    CarUser findByEmail(String email2);
+
 }

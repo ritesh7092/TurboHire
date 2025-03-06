@@ -1,12 +1,18 @@
 package com.Rental.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 
 import java.util.ArrayList;
 import java.util.Collection;
+
+
 
 @Entity
 public class CarUser extends User {
@@ -15,6 +21,9 @@ public class CarUser extends User {
 	 * 
 	 */
 	private static final long serialVersionUID = 1L;
+    @NotBlank
+	@Size(min = 5, message = "Username must be at least 5 characters long")
+	@Column(nullable = false, unique = true)
 	@Id
     private String username;
     private String email;
