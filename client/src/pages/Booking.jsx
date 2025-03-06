@@ -35,4 +35,4 @@ const Booking = () => {
     );
 };
 
-export default Dashboard;
+export default Booking;

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const Login = () => {
+const AdminLogin = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
@@ -29,7 +29,7 @@ const Login = () => {
 
   return (
     <div className="max-w-md mx-auto mt-20 p-6 bg-white shadow-md rounded-md">
-      <h2 className="text-2xl font-bold mb-4">Login</h2>
+      <h2 className="text-2xl font-bold mb-4">Admin Login</h2>
       <form onSubmit={handleLogin}>
         <input
           type="email"
@@ -51,16 +51,14 @@ const Login = () => {
       </form>
 
       <p className="mt-4 text-sm text-center">
-        <a href="/admin-login" className="text-blue-500 hover:underline">
-          Admin Login
+        <a href="/login" className="text-blue-500 hover:underline">
+          Customer Login
         </a>
-      </p>
-
-      <p className="mt-2 text-sm text-center">
-        Don't have an account? <a href="/signup" className="text-green-500">Sign Up</a>
       </p>
     </div>
   );
 };
 
-export default Login;
+export default AdminLogin;
+
+
